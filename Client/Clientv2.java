@@ -1,6 +1,7 @@
 import java.net.*;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.DataInputStream;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -11,24 +12,25 @@ import java.security.spec.X509EncodedKeySpec;
 import java.io.*;
 import java.util.Scanner;
 
-public class Client 
+public class Clientv2 
 {
     // initialize socket and scanner
     private Socket socket;
     private Scanner scanner;
 
     // constructor to put ip address and port
-    private Client(InetAddress ipAddress, int port) throws Exception
+    private Clientv2(InetAddress ipAddress, int port) throws Exception
     {
         this.socket = new Socket(ipAddress,port);
         this.scanner = new Scanner(System.in);
     }
     
     //After successfuly finding ip and port start connection
-    private void start(Client client) throws IOException
+    private void start(Clientv2 client) throws IOException
     {
         String input = "";
         String data = null;
+        BufferedReader inPK = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
         BufferedReader in = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
         PrintWriter out = new PrintWriter(this.socket.getOutputStream(), true);        
         
@@ -36,10 +38,8 @@ public class Client
         PublicKey pk = getPubKey();
         sendPubKeyToServer(client, pk);
         
-
         //Há alguma inconformidade com o sendPK...
-        BufferedReader inPK = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
-        String receivedPK = in.readLine();
+        String receivedPK = inPK.readLine();
         System.out.println("\r\nServer Public Key:\n" + receivedPK);
 
 
@@ -107,7 +107,7 @@ public class Client
      * @throws IOException
      **/
 
-    private static void sendPubKeyToServer(Client client, PublicKey pk) throws IOException 
+    private static void sendPubKeyToServer(Clientv2 client, PublicKey pk) throws IOException 
     {
         try 
         {
@@ -129,7 +129,7 @@ public class Client
 
     public static void main(String[] args) throws Exception 
     {
-        Client client = new Client(InetAddress.getByName(args[0]), Integer.parseInt(args[1]));
+        Clientv2 client = new Clientv2(InetAddress.getByName(args[0]), Integer.parseInt(args[1]));
         //Check and/or create file with public key
         File f = new File("pub_key");
         if (!f.isFile()) 
