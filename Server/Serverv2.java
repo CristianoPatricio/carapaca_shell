@@ -1,3 +1,4 @@
+import java.io.*;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.InetAddress;
@@ -20,11 +21,11 @@ import java.security.spec.X509EncodedKeySpec;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 
-public class Server {
+public class Serverv2 {
 
     private ServerSocket server;
 
-    public Server(String ipAddress) throws Exception {
+    public Serverv2(String ipAddress) throws Exception {
         // 0 -> port number that is automatically allocated
         // 1 -> requested maximum length of the queue of incoming connections
         this.server = new ServerSocket(50172, 1, InetAddress.getByName(ipAddress));
@@ -42,10 +43,9 @@ public class Server {
             byte[] encKey = new byte[keyfis.available()];
             keyfis.read(encKey);
             keyfis.close();
-
+            System.out.println("Byte key Server: " + new String(encKey));
             // Obtain a key specification
             X509EncodedKeySpec pubKeySpec = new X509EncodedKeySpec(encKey);
-
             // KeyFactory to do the conversion
             KeyFactory keyFactory = KeyFactory.getInstance("DSA", "SUN");
 
@@ -113,6 +113,22 @@ public class Server {
     {
         try 
         {
+            byte[] key = pk.getEncoded();
+            String pk_client = new String(key);
+
+            PrintStream toClient = new PrintStream(client.getOutputStream());
+            System.out.println("SERVER: Enviando chave publica para cliente.........");
+            toClient.println(pk_client);
+
+        } catch (Exception e) {
+            System.out.println("Caught exception: " + e.toString());
+        }
+    }
+
+    /*private static void sendPubKeyToclient(Socket client, PublicKey pk) throws IOException 
+    {
+        try 
+        {
             PrintWriter out = new PrintWriter(client.getOutputStream(), false);
 
             // Send pk to Client
@@ -126,7 +142,7 @@ public class Server {
         {
             System.out.println("Caught exception: " + e.toString());
         }
-    }
+    }*/
 
     public InetAddress getSocketAddress(){
         return this.server.getInetAddress();
@@ -162,7 +178,7 @@ public class Server {
         }
 
         //Criar servidor:
-        Server app = new Server(args[0]);
+        Serverv2 app = new Serverv2(args[0]);
         System.out.println("\r\nRunning Server: " + "Host=" + app.getSocketAddress().getHostAddress() + " Port=" + app.getPort());
         System.out.println("Waiting...");
 
