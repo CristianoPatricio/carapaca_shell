@@ -43,7 +43,6 @@ public class Serverv2 {
             byte[] encKey = new byte[keyfis.available()];
             keyfis.read(encKey);
             keyfis.close();
-            System.out.println("Byte key Server: " + new String(encKey));
             // Obtain a key specification
             X509EncodedKeySpec pubKeySpec = new X509EncodedKeySpec(encKey);
             // KeyFactory to do the conversion
@@ -63,17 +62,10 @@ public class Serverv2 {
 
     private void listen() throws Exception 
     {
-        String data = null;
         Socket client = this.server.accept();
         String clientAddress = client.getInetAddress().getHostAddress();
         System.out.println("\r\nNew connection from " + clientAddress);
         
-        BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
-        PrintWriter out = new PrintWriter(client.getOutputStream(), true);
-        String mensagem = "recebido";
-        //Fazer todas as verificações:
-
-
         //get client public Key
         BufferedReader inPK = new BufferedReader(new InputStreamReader(client.getInputStream()));
         String receivedPK = inPK.readLine();
@@ -82,30 +74,39 @@ public class Serverv2 {
         //Send Server public key to client:
         PublicKey pk = getPubKey();
         sendPubKeyToclient(client, pk);
-        //It is not sending the full KEY!
 
+        receiveClientMSG(client, clientAddress);
+    }
 
+    private static void receiveClientMSG (Socket client, String clientAddress) throws IOException {
+        BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
+        PrintWriter out = new PrintWriter(client.getOutputStream(), true);
+        String mensagem = "recebido";
 
+        String data = null;
 
-
-
-        //Todas as verificações foram feitas:
-        while ((data = in.readLine()) != null) 
-        {
-            if(data.equals("kys"))
+        try {
+            //Todas as verificações foram feitas:
+            while ((data = in.readLine()) != null) 
             {
-                end(client);
+                System.out.println("Entrei aqui server");
+                if(data.equals("kys"))
+                {
+                    end(client);
+                }
+                else if (data.equals("exit")) 
+                {
+                    return;    
+                }   
+                else
+                {
+                    System.out.println("\r\nMessage from " + clientAddress + ": " + data);
+                    out.println(mensagem);
+                    out.flush();
+                }
             }
-            else if (data.equals("exit")) 
-            {
-                return;    
-            }   
-            else
-            {
-                System.out.println("\r\nMessage from " + clientAddress + ": " + data);
-                out.println(mensagem);
-                out.flush();
-            }
+        } catch (IOException i) {
+            System.out.println("Caught Exception: " + i.toString());
         }
     }
 
@@ -152,7 +153,7 @@ public class Serverv2 {
         return this.server.getLocalPort();
     }
 
-    public void end(Socket client)
+    public static void end(Socket client)
     {
         System.out.println("..........Closing Server..........");
         try
