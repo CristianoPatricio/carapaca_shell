@@ -28,44 +28,56 @@ public class Clientv2
     //After successfuly finding ip and port start connection
     private void start(Clientv2 client) throws IOException
     {
-        String input = "";
-        String data = null;
-        BufferedReader inPK = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
-        BufferedReader in = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
-        PrintWriter out = new PrintWriter(this.socket.getOutputStream(), true);        
-        
         //Send pk to Server.
         PublicKey pk = getPubKey();
         sendPubKeyToServer(client, pk);
+        //Receive pk to Server.
+        receiveServerPubKey(client);
+
+        //Send msg to server and receive feedback.
+        sendMSGtoServer(client, this.scanner);
+    }
+
+    private static void sendMSGtoServer (Clientv2 client, Scanner sc) throws IOException {
+        String input = sc.nextLine();
         
-        //Há alguma inconformidade com o sendPK...
-        String receivedPK = inPK.readLine();
-        System.out.println("\r\nServer Public Key:\n" + receivedPK);
+        try {
+            PrintStream toServer = new PrintStream(client.socket.getOutputStream());        
 
-
-        while (!input.equals("exit") && !input.equals("kys")) 
-        {            
-            if((data = in.readLine()) != null)
+            while (!input.equals("exit") && !input.equals("kys")) 
             {
-                System.out.println(data);
+                System.out.println("Entrei aqui client");
+                
+                toServer.println(input);
+                System.out.println("Message to server: " + input);
+                if (!input.equals("exit") && !input.equals("kys")) {
+                    feedbackFromServer(client);
+                }
+
+                input = sc.nextLine();            
             }
 
-            input = scanner.nextLine();            
-
-
-            out.println(input);
-            out.flush();
-        }
-
-        // close the connection
-        try 
-        {
-            System.out.println("..........Closing Connection..........");
-            socket.close();
-        } 
-        catch (IOException i) 
+            //System.out.println("..........Closing Connection..........");
+            //sc.close();
+        } catch (IOException i) 
         {
             System.out.println(i);
+        }
+        sc.close();
+    }
+
+    private static void feedbackFromServer (Clientv2 client) throws IOException {
+        BufferedReader in = new BufferedReader(new InputStreamReader(client.socket.getInputStream()));
+        String data = null;
+         
+        try { 
+            if((data = in.readLine()) != null)
+            {
+                System.out.println("Entrei aqui! Cacete");
+                System.out.println(data);
+            }
+        } catch (IOException i) {
+            System.out.println("Caught Exception: " + i.toString());
         }
     }
 
@@ -97,6 +109,22 @@ public class Clientv2
         {
             System.out.println("Caught exception: " + e.toString());
             return null;
+        }
+    }
+
+    /**
+     * Receives the pub key to the Server
+     * @param client
+     * @throws IOException
+     **/
+
+    private static void receiveServerPubKey (Clientv2 client) throws IOException {
+        try {
+            BufferedReader inPK = new BufferedReader(new InputStreamReader(client.socket.getInputStream()));
+            String receivedPK = inPK.readLine();
+            System.out.println("\r\nServer Public Key:\n" + receivedPK);
+        } catch (Exception e) {
+            System.out.println("Caught exception: " + e.toString());
         }
     }
 
