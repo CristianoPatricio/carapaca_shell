@@ -1,8 +1,8 @@
-
+package Server;
 
 public class EncryptParams {
-    private byte[] ciphertext;
-    private byte[] encodedParams;
+    public byte[] ciphertext;
+    public byte[] encodedParams;
 
     public EncryptParams (byte[] ciphertext, byte[] encodedParams) {
         this.ciphertext = ciphertext;

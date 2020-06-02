@@ -1,3 +1,5 @@
+package Client;
+
 import java.io.*;
 import java.math.BigInteger;
 import java.security.*;
@@ -13,7 +15,7 @@ public class DH_Client {
 
     private static KeyAgreement clientKeyAgree;
     
-    public static byte[] getServePubKeyEnc(byte[] serverPubKeyEnc) 
+    public static byte[] getClientPubKeyEnc(byte[] serverPubKeyEnc) 
         throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidAlgorithmParameterException,
             InvalidKeyException {
         /*
@@ -41,9 +43,9 @@ public class DH_Client {
         clientKeyAgree.init(clientKpair.getPrivate());
 
         // Client encodes his public key, and sends it over to Server.
-        byte[] servePubKeyEnc = clientKpair.getPublic().getEncoded();
+        byte[] clientPubKeyEnc = clientKpair.getPublic().getEncoded();
         
-        return servePubKeyEnc;
+        return clientPubKeyEnc;
     }
 
     public static byte[] getClientSharedSecret(byte[] serverPubKeyEnc)

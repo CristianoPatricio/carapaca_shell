@@ -1,3 +1,5 @@
+package Client;
+
 import java.io.IOException;
 import java.security.AlgorithmParameters;
 import java.security.InvalidAlgorithmParameterException;
@@ -5,7 +7,6 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
-
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
@@ -55,7 +56,7 @@ public class Utilities {
      /*
      * Converts a byte to hex digit and writes to the supplied buffer
      */
-    private static void byte2hex(byte b, StringBuffer buf) {
+    public static void byte2hex(byte b, StringBuffer buf) {
         char[] hexChars = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
         int high = ((b & 0xf0) >> 4);
         int low = (b & 0x0f);
@@ -66,15 +67,29 @@ public class Utilities {
     /*
      * Converts a byte array to hex string
      */
-    private static String toHexString(byte[] block) {
+    public static String toHexString(byte[] block) {
         StringBuffer buf = new StringBuffer();
         int len = block.length;
         for (int i = 0; i < len; i++) {
             byte2hex(block[i], buf);
-            if (i < len - 1) {
-                buf.append(":");
-            }
+            //if (i < len - 1) {
+            //    buf.append(":");
+            //}
         }
         return buf.toString();
+    }
+
+    /*
+     * Converts a hex string to ascii string
+     */
+    public static String hexToAscii(String hexStr) {
+        StringBuilder output = new StringBuilder("");
+         
+        for (int i = 0; i < hexStr.length(); i += 2) {
+            String str = hexStr.substring(i, i + 2);
+            output.append((char) Integer.parseInt(str, 16));
+        }
+         
+        return output.toString();
     }
 }
