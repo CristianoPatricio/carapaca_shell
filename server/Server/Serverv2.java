@@ -262,34 +262,34 @@ public class Serverv2 {
                     return;
                 } else {
                     System.out.println("\r\nMessage from " + clientAddress + ": " + decryptMessage);
-                    // out.println(mensagem);
-                    // out.flush();
-                    String command = "cmd /c " + decryptMessage;
+                    
+                    String osname = Utilities.getOsSystem();
+                    System.out.println("SO: " + osname);
 
+                    String command = "";
+                    if (osname.contains("win")) {
+                        command = "cmd /c " + decryptMessage;
+                    } else { // Ubuntu/Mac
+                        command = "/bin/sh -c" + decryptMessage;
+                    }
+                    
                     try {
                         Process process = Runtime.getRuntime().exec(command);
 
-                        StringBuilder output = new StringBuilder();
-
                         BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                        
                         String line;
                         while ((line = reader.readLine()) != null) {
                             System.out.println(line);
-                            //output.append(line + "\n");
                             out.println(line);
                             out.flush();
                         }
-                        
-                        //String message = "END";
-                        //sendBytesToClient(client, message.getBytes("UTF-8"));
-
+                      
                         reader.close();
                         System.out.println("TERMINEI!");
                         // Enviar mensagem para o servidor
-                        out.write("end \n");
-                        out.flush();
-                        //output.
-                        //sendSecureMessageToClient(client, serverSecretSharedKey, the_array);
+                        out.write("end\n");
+                        out.flush();                    
                     } catch (IOException e) {
                         e.printStackTrace();
                     }

@@ -313,8 +313,8 @@ public class Clientv2 {
         try { 
             if((data = in.readLine()) != null)
             {
-                if (data.equals("end ")) {
-                    System.out.println("Entrei Aqui");
+                if (data.equals("end")) {
+                    //System.out.println("Entrei Aqui");
                     return 0;
                 }
                 System.out.println(data);

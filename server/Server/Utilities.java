@@ -206,4 +206,10 @@ public class Utilities {
 
         return oBIdesafio.toByteArray();
     }
+
+    public static String getOsSystem() {
+        String osname = System.getProperty("os.name");
+        osname = osname.toLowerCase();
+        return osname;
+    }
 }
