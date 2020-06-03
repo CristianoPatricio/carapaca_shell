@@ -290,11 +290,15 @@ public class Clientv2 {
                     return;
                 }
                 
-                while (!input.equals("exit")) {
-                    int buff = feedbackFromServer(client);
-                    if (buff == 0) break;
-                }
+                //while (!input.equals("exit")) {
+                //    int buff = feedbackFromServer(client);
+                //    if (buff == 0) break;
+                //}
+
+                byte[] msg = receiveSecureMessageFromServer(client, clientSecretSharedKey);
+                String output = new String(msg, StandardCharsets.UTF_8);
                 
+                System.out.println(output);
                 System.out.print(username+"@"+ipServer+":# ");
                 input = sc.nextLine();   
             }

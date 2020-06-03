@@ -276,20 +276,25 @@ public class Serverv2 {
                     try {
                         Process process = Runtime.getRuntime().exec(command);
 
+                        StringBuffer sf = new StringBuffer();
+
                         BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
                         
                         String line;
                         while ((line = reader.readLine()) != null) {
                             System.out.println(line);
-                            out.println(line);
-                            out.flush();
+                            sf.append(line + "\n");
+                            //out.println(line);
+                            //out.flush();
                         }
                       
                         reader.close();
                         System.out.println("TERMINEI!");
                         // Enviar mensagem para o servidor
-                        out.write("end\n");
-                        out.flush();                    
+                        byte[] msg = String.valueOf(sf).getBytes("UTF-8");
+                        sendSecureMessageToClient(client, serverSecretSharedKey, msg);
+                        //out.write("end\n");
+                        //out.flush();                    
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
