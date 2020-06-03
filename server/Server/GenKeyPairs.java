@@ -1,4 +1,3 @@
-package Server;
 
 import java.io.FileOutputStream;
 import java.security.KeyPair;

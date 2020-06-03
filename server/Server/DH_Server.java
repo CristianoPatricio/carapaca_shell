@@ -1,4 +1,3 @@
-package Server;
 
 import java.io.*;
 import java.math.BigInteger;

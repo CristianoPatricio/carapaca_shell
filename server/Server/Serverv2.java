@@ -1,4 +1,3 @@
-package Server;
 
 import java.io.*;
 import java.io.BufferedReader;
@@ -6,13 +5,25 @@ import java.io.InputStreamReader;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.math.BigInteger;
 import java.util.Scanner;
+import java.util.Arrays;
+import java.util.Base64;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.SecretKeySpec;
+
 import java.io.PrintWriter;
+import java.lang.reflect.Array;
 import java.security.SecureRandom;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -36,11 +47,9 @@ public class Serverv2 {
 
     /**
      * @return public key
-     **/  
-    private static PublicKey getPubKey() 
-    {
-        try 
-        {
+     **/
+    private static byte[] getPubKey() {
+        try {
             // get pub key and send it to the Server
             FileInputStream keyfis = new FileInputStream("pub_key");
             byte[] encKey = new byte[keyfis.available()];
@@ -54,56 +63,132 @@ public class Serverv2 {
             // Generate a PublicKey from the key specification
             PublicKey pubKey = keyFactory.generatePublic(pubKeySpec);
 
-            return pubKey;
-        } 
-        catch (Exception e) 
-        {
+            return encKey;
+        } catch (Exception e) {
             System.out.println("Caught exception: " + e.toString());
             return null;
         }
     }
 
-    private void listen() throws Exception 
-    {
+    private void listen() throws Exception {
+        
+        DBUtilities db = new DBUtilities();
         Socket client = this.server.accept();
         String clientAddress = client.getInetAddress().getHostAddress();
         System.out.println("\r\nNew connection from " + clientAddress);
 
-        // 1. Gera par de chaves Diffie Helman
-        byte[] pubKeyServer = DH_Server.getServerPubKeyEnc();
-        System.out.println("Chave enviada para o cliente: " + Utilities.toHexString(pubKeyServer));
-        // 2. Enviar a pubkey para o cliente
-        sendPubDHToClient(client, pubKeyServer);
-        // 5. Receive pubKeyDH client
-        byte[] receiveClientPubKeyDH = receiveClientPubKeyDH(client);
-        System.out.println("From Client: " + Utilities.toHexString(receiveClientPubKeyDH));
+        // Receber chave pública do cliente
+        byte[] pubKeyClient = receiveBytesFromClient(client);
+        System.out.println("\r\nPublic Key of Client:" + Utilities.toHexString(pubKeyClient));
 
-        // 7. Gerar chave secreta partilhada
-        byte[] serverSecretSharedKey = DH_Server.getServerSharedSecretKey(receiveClientPubKeyDH);
-        System.out.println("Chave Secreta Partilhada: " + Utilities.toHexString(serverSecretSharedKey));
+        // Receber o nome do utilizador a que o cliente se quer ligar
+        byte[] username = receiveBytesFromClient(client);
+        String usernameToString = new String(username, StandardCharsets.UTF_8);
+        System.out.println("\r\nUsername: " + usernameToString);
 
-        SecretKeySpec serverAesKey = new SecretKeySpec(serverSecretSharedKey, 0, 16, "AES");
+        // Verificar se o user a que o cliente se quer ligar, existe
+        int userCount = db.verifyUserExists(usernameToString);
+        if (userCount > 0) { // O utilizador existe
+            // 1. Gera par de chaves Diffie Helman
+            byte[] pubKeyServer = DH_Server.getServerPubKeyEnc();
+            System.out.println("\r\nPub key sent to client: " + Utilities.toHexString(pubKeyServer));
+            // 2. Enviar a pubkeyDH para o cliente
+            sendBytesToClient(client, pubKeyServer);
+            // 5. Receber pubKeyDH do cliente
+            byte[] pubKeyDHClient = receiveBytesFromClient(client);
+            System.out.println("\r\nPub key received from client: " + Utilities.toHexString(pubKeyDHClient));
+            // 7. Gerar chave secreta partilhada
+            byte[] serverSecretSharedKey = DH_Server.getServerSharedSecretKey(pubKeyDHClient);
+            System.out.println("\r\nShared secret key: " + Utilities.toHexString(serverSecretSharedKey));
 
-        // 5. Receive pubKeyDH client
-        byte[] ciphertext = receiveClientPubKeyDH(client);
-        // 5. Receive pubKeyDH client
-        byte[] encodedParams = receiveClientPubKeyDH(client);
+            /*******************************CANAL SEGURO********************************/
 
-        byte[] messageDecrypt = Utilities.decryptMode(serverAesKey, encodedParams, ciphertext);
-        System.out.println("Mensagem: " + Utilities.hexToAscii(Utilities.toHexString(messageDecrypt)));
+            // Verificar se a Public Key do Cliente está na tabela das chaves autorizadas
+            String sClientPk = Utilities.getPublicKey(pubKeyClient).toString();
+            int userID = db.selectIDUser(usernameToString);
+            //System.out.println("User ID: " + userID);
+            //String sPK = db.selectPKAuthKeys(userID);
+            //System.out.println("PK BD: " + sPK);
+            //System.out.println("PK Client: " + sClientPk);
+            int count = db.verifyPKAuthKeys(sClientPk, userID);
+            //System.out.println("Count users: " + count);
+            String verified = "NOK";
+            // Se for uma chave autorizada, Então:
+            if (count > 0) {
+                // Enviar metodo de autenticação
+                String method = "pk_auth";
+                sendSecureMessageToClient(client,serverSecretSharedKey,method.getBytes("UTF-8"));
+                // Enviar Nonce para o cliente assinar
+                byte[] nonce = Utilities.nonce();
+                //sendSecureMessageToClient(client, serverSecretSharedKey, nonce);
+                sendBytesToClient(client, nonce);
+                // Receber assinatura
+                //byte[] signature = receiveSecureMessageFromClient(client, serverSecretSharedKey);
+                byte[] signature = receiveBytesFromClient(client);
+                // Verificar se a assinatura é válida
+                boolean verifies = Utilities.verifySignature(Utilities.getPublicKey(pubKeyClient), signature, nonce);
 
-        /*
-        //get client public Key
-        BufferedReader inPK = new BufferedReader(new InputStreamReader(client.getInputStream()));
-        String receivedPK = inPK.readLine();
-        System.out.println("\r\nClient Public Key:\n" + receivedPK);
+                if (verifies) { // Cliente autenticado
+                    System.out.println("\r\nVerified: OK!");
+                    verified = "OK";
+                } else {
+                    System.out.println("\r\nVerified: Invalid!");
+                    verified = "Exit";
+                }
+    
+                // Send confirmation to Client
+                sendSecureMessageToClient(client, serverSecretSharedKey, verified.getBytes("UTF-8"));
+            } else {
+                int nTentativas = 3;
+                // Enviar metodo de autenticação
+                String method = "pass";
+                sendSecureMessageToClient(client, serverSecretSharedKey, method.getBytes("UTF-8"));
+                do {
+                    // Pedir a password do user a que o client se quer ligar
+                    String enterPw = "Enter password for "+usernameToString+": ";
+                    sendSecureMessageToClient(client, serverSecretSharedKey, enterPw.getBytes("UTF-8"));
+                    // Verificar se a password recebida coincide com a password do user
+                    byte[] password = receiveSecureMessageFromClient(client, serverSecretSharedKey);
+                    String passwordToString = new String(password, StandardCharsets.UTF_8);
+                    //System.out.println("Password recebida: " + passwordToString);
+                    String passwordUser = db.selectPWUser(userID);
+                    String salt = db.selectSaltUser(userID);
+                    passwordToString = DBUtilities.getHash(DBUtilities.getHex(password), salt);
+                    //System.out.println("Password com salt: " + passwordToString);
+                    //System.out.println("Password com salt USER: " + passwordUser);
+                    // 3.3 Se SIM:
+                    nTentativas--;
+                    if (passwordUser.equals(passwordToString)) {
+                        // Adicionar a Pub Key do cliente à lista de chaves autorizadas
+                        db.insertAuthKeys(userID, clientAddress, sClientPk);
+                        // Send confirmation to Client
+                        //System.out.println("Password Correta!");
+                        verified = "OK";
+                        sendSecureMessageToClient(client, serverSecretSharedKey, verified.getBytes());
+                    } else {
+                        //System.out.println("Password Incorreta!");
+                        if (nTentativas == 0) {
+                            // Send message to Client
+                            verified = "Exit";
+                            sendSecureMessageToClient(client, serverSecretSharedKey, verified.getBytes());
+                            break;
+                        }
+                        // Send confirmation to Client
+                        verified = "NOK";
+                        sendSecureMessageToClient(client, serverSecretSharedKey, verified.getBytes());
+                    }
+                } while (verified.equals("NOK"));
+            }
 
-        //Send Server public key to client:
-        PublicKey pk = getPubKey();
-        sendPubKeyToclient(client, pk);
+            if (verified.equals("OK")) {
+                receiveClientMSG(client, clientAddress, serverSecretSharedKey);
+            } else {
+                client.close();
+            }
 
-        receiveClientMSG(client, clientAddress);
-        */
+        } else { // O utilizador não existe
+            client.close();
+        }   
     }
 
     /**
@@ -114,14 +199,14 @@ public class Serverv2 {
      * @throws IOException
      **/
 
-    private static byte[] receiveClientPubKeyDH(Socket client) throws IOException {
+    private static byte[] receiveBytesFromClient(Socket client) throws IOException {
         try {
             DataInputStream dIn = new DataInputStream(client.getInputStream());
-            
+
             int length = dIn.readInt();
-            byte[] message = new byte[length];                    // read length of incoming message
-            if(length>0) {
-                dIn.readFully(message, 0, message.length); // read the message~                
+            byte[] message = new byte[length]; // read length of incoming message
+            if (length > 0) {
+                dIn.readFully(message, 0, message.length); // read the message~
             }
             return message;
         } catch (Exception e) {
@@ -130,31 +215,84 @@ public class Serverv2 {
         }
     }
 
-    private static void receiveClientMSG (Socket client, String clientAddress) throws IOException {
-        BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
-        PrintWriter out = new PrintWriter(client.getOutputStream(), true);
-        String mensagem = "recebido";
+    private static void receiveClientMSG(Socket client, String clientAddress, byte[] serverSecretSharedKey)
+            throws IOException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException,
+            InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, InterruptedException {
 
-        String data = null;
+        PrintWriter out = new PrintWriter(client.getOutputStream(), true);
+        SecretKeySpec serverAesKey = new SecretKeySpec(serverSecretSharedKey, 0, 16, "AES");
+        // String mensagem = "recebido";
 
         try {
-            //Todas as verificações foram feitas:
-            while ((data = in.readLine()) != null) 
-            {
-                System.out.println("Entrei aqui server");
-                if(data.equals("kys"))
-                {
-                    end(client);
+            int len = 1;
+            while (len > 0) {
+                byte[] concat = receiveBytesFromClient(client);
+
+                byte[] hmac = receiveBytesFromClient(client);
+
+                // System.out.println("Message: " + Utilities.toHexString(concat));
+
+                len = concat.length;
+                int posCipher = len - 18;
+
+                byte[] ciphertext = new byte[posCipher];
+                System.arraycopy(concat, 0, ciphertext, 0, posCipher);
+
+                byte[] encodedParams = new byte[18];
+                System.arraycopy(concat, posCipher, encodedParams, 0, 18);
+
+                byte[] messageDecrypt = Utilities.decryptMode(serverAesKey, encodedParams, ciphertext);
+
+                String decryptMessage = new String(messageDecrypt, StandardCharsets.UTF_8);
+
+                // Verify HMAC
+                byte[] hmacDecryptMessage = Utilities.HmacSha256(serverSecretSharedKey,
+                        decryptMessage.getBytes("UTF-8"));
+                if (Arrays.equals(hmac, hmacDecryptMessage)) {
+                    System.out.println("\r\nHMAC mathes!");
+                } else {
+                    System.out.println("\r\nHMAC does not match!");
                 }
-                else if (data.equals("exit")) 
-                {
-                    return;    
-                }   
-                else
-                {
-                    System.out.println("\r\nMessage from " + clientAddress + ": " + data);
-                    out.println(mensagem);
-                    out.flush();
+
+                if (decryptMessage.equals("kys")) {
+                    end(client);
+                } else if (decryptMessage.equals("exit")) {
+                    // System.out.println("Entrei no exit");
+                    client.close();
+                    return;
+                } else {
+                    System.out.println("\r\nMessage from " + clientAddress + ": " + decryptMessage);
+                    // out.println(mensagem);
+                    // out.flush();
+                    String command = "cmd /c " + decryptMessage;
+
+                    try {
+                        Process process = Runtime.getRuntime().exec(command);
+
+                        StringBuilder output = new StringBuilder();
+
+                        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            System.out.println(line);
+                            //output.append(line + "\n");
+                            out.println(line);
+                            out.flush();
+                        }
+                        
+                        //String message = "END";
+                        //sendBytesToClient(client, message.getBytes("UTF-8"));
+
+                        reader.close();
+                        System.out.println("TERMINEI!");
+                        // Enviar mensagem para o servidor
+                        out.write("end \n");
+                        out.flush();
+                        //output.
+                        //sendSecureMessageToClient(client, serverSecretSharedKey, the_array);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
         } catch (IOException i) {
@@ -162,99 +300,166 @@ public class Serverv2 {
         }
     }
 
-
-    private static void sendPubDHToClient(Socket client, byte[] pk) {
+    private static void sendBytesToClient(Socket client, byte[] message) {
         try {
             DataOutputStream dOut = new DataOutputStream(client.getOutputStream());
-            
-            System.out.println("SERVER: Enviando chave publica DH para cliente.........");
-            dOut.writeInt(pk.length); // write length of the message
-            dOut.write(pk);           // write the message
+
+            dOut.writeInt(message.length); // write length of the message
+            dOut.write(message); // write the message
             dOut.flush();
-            System.out.println("DONE!");
+            //System.out.println("Enviado com sucesso!");
         } catch (Exception e) {
             System.out.println("Caught exception: " + e.toString());
         }
     }
 
-    private static void sendPubKeyToclient(Socket client, PublicKey pk) throws IOException 
-    {
-        try 
-        {
-            byte[] key = pk.getEncoded();
-            String pk_client = new String(key);
+    private static void sendSecureMessageToClient(Socket client, byte[] serverSecretSharedKey, byte[] message) {
 
-            PrintStream toClient = new PrintStream(client.getOutputStream());
-            System.out.println("SERVER: Enviando chave publica para cliente.........");
-            toClient.println(pk_client);
+        SecretKeySpec serverAesKey = new SecretKeySpec(serverSecretSharedKey, 0, 16, "AES");
 
+        try {
+            DataOutputStream dOut = new DataOutputStream(client.getOutputStream());
+
+            // Calculate HMAC SHA 256
+            byte[] hmacSha256 = Utilities.HmacSha256(serverSecretSharedKey, message);
+            // Encrypt
+            EncryptParams encParam = Utilities.encryptMessage(serverAesKey, message);
+
+            byte[] ciphertext = encParam.ciphertext;
+            byte[] encodedParams = encParam.encodedParams;
+            // create a destination array that is the size of the two arrays
+            byte[] destination = new byte[ciphertext.length + encodedParams.length];
+            // copy ciphertext into start of destination (from pos 0, copy ciphertext.length bytes)
+            System.arraycopy(ciphertext, 0, destination, 0, ciphertext.length);
+            // copy encodedParams into end of destination (from pos ciphertext.length, copy encodedParams.length bytes)
+            System.arraycopy(encodedParams, 0, destination, ciphertext.length, encodedParams.length);
+ 
+            // Send encrypted message
+            dOut.writeInt(destination.length); // write length of the message
+            dOut.write(destination);           // write the message
+            dOut.flush();
+
+            // Send HMAC
+            dOut.writeInt(hmacSha256.length); // write length of the message
+            dOut.write(hmacSha256);           // write the message
+            dOut.flush();
+        } catch (Exception e) {
+            System.out.println("Caught exception at " + e.toString());
+        }
+    }
+
+    private static byte[] receiveSecureMessageFromClient(Socket client, byte[] serverSecretSharedKey)
+            throws InvalidKeyException, NoSuchAlgorithmException, NoSuchPaddingException,
+            InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, IOException {
+        SecretKeySpec serverAesKey = new SecretKeySpec(serverSecretSharedKey, 0, 16, "AES");
+        
+        byte[] louco = new byte[1000];
+        try {
+            byte[] concat = receiveBytesFromClient(client);
+            byte[] hmac = receiveBytesFromClient(client);
+
+            int len = concat.length;
+            int posCipher = len - 18;
+
+            byte[] ciphertext = new byte[posCipher];
+            System.arraycopy(concat, 0, ciphertext, 0, posCipher);
+            byte[] encodedParams = new byte[18];
+            System.arraycopy(concat, posCipher, encodedParams, 0, 18);
+
+            byte[] messageDecrypt = Utilities.decryptMode(serverAesKey, encodedParams, ciphertext);
+            String decryptMessage = new String(messageDecrypt, StandardCharsets.UTF_8);
+
+            // Verify HMAC
+            byte[] hmacDecryptMessage = Utilities.HmacSha256(serverSecretSharedKey, decryptMessage.getBytes("UTF-8"));
+            if (Arrays.equals(hmac, hmacDecryptMessage)) {
+                return messageDecrypt;
+            } else {
+                System.out.println("\r\nHMAC does not match!");
+                return louco;
+            }
+        } catch (Exception e) {
+            System.out.println("Caught exception at " + e.toString());
+            return null;
+        }
+        
+    }
+
+    private static void sendPubKeyToclient(Socket client, byte[] pk) throws IOException {
+        try {
+            DataOutputStream dOut = new DataOutputStream(client.getOutputStream());
+
+            // System.out.println("SERVER: Sending public key to server...");
+            dOut.writeInt(pk.length); // write length of the message
+            dOut.write(pk); // write the message
+            dOut.flush();
+            System.out.println("Sent successfully!");
         } catch (Exception e) {
             System.out.println("Caught exception: " + e.toString());
         }
     }
 
-    /*private static void sendPubKeyToclient(Socket client, PublicKey pk) throws IOException 
-    {
-        try 
-        {
-            PrintWriter out = new PrintWriter(client.getOutputStream(), false);
-
-            // Send pk to Client
-            byte[] key = pk.getEncoded();
-            String pk_client = new String(key); //adicionada  
-            System.out.println("SERVER: Enviando chave publica para cliente.........");
-            out.println("-pk " + pk_client);
-            out.flush();
-        }
-        catch (Exception e)
-        {
+    private static String getPubKeyFromClient(Socket client) throws IOException {
+        try {
+            BufferedReader inPK = new BufferedReader(new InputStreamReader(client.getInputStream()));
+            String receivedPK = inPK.readLine();
+            return receivedPK;
+        } catch (Exception e) {
             System.out.println("Caught exception: " + e.toString());
+            return null;
         }
-    }*/
 
-    public InetAddress getSocketAddress(){
+    }
+
+    /*
+     * private static void sendPubKeyToclient(Socket client, PublicKey pk) throws
+     * IOException { try { PrintWriter out = new
+     * PrintWriter(client.getOutputStream(), false);
+     * 
+     * // Send pk to Client byte[] key = pk.getEncoded(); String pk_client = new
+     * String(key); //adicionada
+     * System.out.println("SERVER: Enviando chave publica para cliente.........");
+     * out.println("-pk " + pk_client); out.flush(); } catch (Exception e) {
+     * System.out.println("Caught exception: " + e.toString()); } }
+     */
+
+    public InetAddress getSocketAddress() {
         return this.server.getInetAddress();
     }
 
-    public int getPort(){
+    public int getPort() {
         return this.server.getLocalPort();
     }
 
-    public static void end(Socket client)
-    {
+    public static void end(Socket client) {
         System.out.println("..........Closing Server..........");
-        try
-        {
+        try {
             client.close();
             System.exit(0);
-        }
-        catch(Exception e)
-        {
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
     }
 
-    public static void main(String[] args) throws Exception 
-    {
-        //criar chaves.
-        File f = new File("pub_key");
-        if (!f.isFile()) {
-            GenKeyPairs genKeys = new GenKeyPairs();
-            genKeys.genKeyPairs();
-            System.out.println("Par criado");
-        }
+    public static void main(String[] args) throws Exception {
+        // criar chaves.
+        //File f = new File("pub_key");
+        //if (!f.isFile()) {
+        //    GenKeyPairs genKeys = new GenKeyPairs();
+        //    genKeys.genKeyPairs();
+        //    System.out.println("Par criado");
+        //}
 
-        //Criar servidor:
+        // Criar servidor:
         Serverv2 app = new Serverv2(args[0]);
-        System.out.println("\r\nRunning Server: " + "Host=" + app.getSocketAddress().getHostAddress() + " Port=" + app.getPort());
+        System.out.println(
+                "\r\nRunning Server: " + "Host=" + app.getSocketAddress().getHostAddress() + " Port=" + app.getPort());
         System.out.println("Waiting...");
 
-        //Começar a ouvir:
-        while(true)
-        {
+        // Começar a ouvir:
+        while (true) {
             app.listen();
-            System.out.println("Previous Connection Closed.");    
+            System.out.println("Previous Connection Closed.");
             System.out.println("Waiting for more connections...");
         }
     }

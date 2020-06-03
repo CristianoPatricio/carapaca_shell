@@ -1,4 +1,3 @@
-package Server;
 
 public class EncryptParams {
     public byte[] ciphertext;
