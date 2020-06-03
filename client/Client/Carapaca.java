@@ -27,19 +27,19 @@ import javax.print.attribute.standard.Media;
 import java.io.Console;
 import java.util.Arrays;
 
-public class Clientv2 {
+public class Carapaca {
     // initialize socket and scanner
     private Socket socket;
     private Scanner scanner;
 
     // constructor to put ip address and port
-    private Clientv2(InetAddress ipAddress, int port) throws Exception {
+    private Carapaca(InetAddress ipAddress, int port) throws Exception {
         this.socket = new Socket(ipAddress, port);
         this.scanner = new Scanner(System.in);
     }
 
     // After successfuly finding ip and port start connection
-    private void start(Clientv2 client, String username) throws IOException, InvalidKeyException, NoSuchAlgorithmException,
+    private void start(Carapaca client, String username) throws IOException, InvalidKeyException, NoSuchAlgorithmException,
             InvalidKeySpecException, IllegalStateException, InvalidAlgorithmParameterException, NoSuchPaddingException,
             IllegalBlockSizeException, BadPaddingException
     {
@@ -139,7 +139,7 @@ public class Clientv2 {
      * @return pubkey
      * @throws IOException
      */
-    private static byte[] receiveBytesFromServer(Clientv2 client) throws IOException {
+    private static byte[] receiveBytesFromServer(Carapaca client) throws IOException {
         try {
             DataInputStream dIn = new DataInputStream(client.socket.getInputStream());
 
@@ -161,7 +161,7 @@ public class Clientv2 {
      * @param client
      * @param pk
      */
-    private static void sendBytesToServer(Clientv2 client, byte[] pk) {
+    private static void sendBytesToServer(Carapaca client, byte[] pk) {
         try {
             DataOutputStream dOut = new DataOutputStream(client.socket.getOutputStream());
             
@@ -175,7 +175,7 @@ public class Clientv2 {
         }
     }
 
-    private static void sendSecureMessageToServer(Clientv2 client, byte[] clientSecretSharedKey, byte[] message) {
+    private static void sendSecureMessageToServer(Carapaca client, byte[] clientSecretSharedKey, byte[] message) {
 
         SecretKeySpec clientAesKey = new SecretKeySpec(clientSecretSharedKey, 0, 16, "AES");
 
@@ -210,7 +210,7 @@ public class Clientv2 {
         }
     }
 
-    private static byte[] receiveSecureMessageFromServer(Clientv2 client, byte[] clientSecretSharedKey)
+    private static byte[] receiveSecureMessageFromServer(Carapaca client, byte[] clientSecretSharedKey)
             throws InvalidKeyException, NoSuchAlgorithmException, NoSuchPaddingException,
             InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, IOException {
         SecretKeySpec clientAesKey = new SecretKeySpec(clientSecretSharedKey, 0, 16, "AES");
@@ -246,7 +246,7 @@ public class Clientv2 {
         
     }
 
-    private static void sendMSGtoServer (Clientv2 client, Scanner sc, byte[] clientSecretSharedKey, String username) throws IOException, InvalidKeyException, NoSuchAlgorithmException,
+    private static void sendMSGtoServer (Carapaca client, Scanner sc, byte[] clientSecretSharedKey, String username) throws IOException, InvalidKeyException, NoSuchAlgorithmException,
     InvalidKeySpecException, IllegalStateException, InvalidAlgorithmParameterException, NoSuchPaddingException,
     IllegalBlockSizeException, BadPaddingException {
 
@@ -384,7 +384,7 @@ public class Clientv2 {
         int posArroba = input.indexOf("@");
         String username = input.substring(0, posArroba);
         String ipaddr = input.substring(posArroba+1, input.length());
-        Clientv2 client = new Clientv2(InetAddress.getByName(ipaddr), port);
+        Carapaca client = new Carapaca(InetAddress.getByName(ipaddr), port);
         //Check and/or create file with public key
         File f = new File("pub_key");
         if (!f.isFile()) 

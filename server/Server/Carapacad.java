@@ -35,11 +35,11 @@ import java.security.spec.X509EncodedKeySpec;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 
-public class Serverv2 {
+public class Carapacad {
 
     private ServerSocket server;
 
-    public Serverv2(String ipAddress) throws Exception {
+    public Carapacad(String ipAddress) throws Exception {
         // 0 -> port number that is automatically allocated
         // 1 -> requested maximum length of the queue of incoming connections
         this.server = new ServerSocket(50172, 1, InetAddress.getByName(ipAddress));
@@ -391,7 +391,7 @@ public class Serverv2 {
         //}
 
         // Criar servidor:
-        Serverv2 app = new Serverv2(args[0]);
+        Carapacad app = new Carapacad(args[0]);
         System.out.println(
                 "\r\nRunning Server: " + "Host=" + app.getSocketAddress().getHostAddress() + " Port=" + app.getPort());
         System.out.println("Waiting...");
