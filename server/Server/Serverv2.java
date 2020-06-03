@@ -45,31 +45,6 @@ public class Serverv2 {
         this.server = new ServerSocket(50172, 1, InetAddress.getByName(ipAddress));
     }
 
-    /**
-     * @return public key
-     **/
-    private static byte[] getPubKey() {
-        try {
-            // get pub key and send it to the Server
-            FileInputStream keyfis = new FileInputStream("pub_key");
-            byte[] encKey = new byte[keyfis.available()];
-            keyfis.read(encKey);
-            keyfis.close();
-            // Obtain a key specification
-            X509EncodedKeySpec pubKeySpec = new X509EncodedKeySpec(encKey);
-            // KeyFactory to do the conversion
-            KeyFactory keyFactory = KeyFactory.getInstance("DSA", "SUN");
-
-            // Generate a PublicKey from the key specification
-            PublicKey pubKey = keyFactory.generatePublic(pubKeySpec);
-
-            return encKey;
-        } catch (Exception e) {
-            System.out.println("Caught exception: " + e.toString());
-            return null;
-        }
-    }
-
     private void listen() throws Exception {
         
         DBUtilities db = new DBUtilities();
@@ -89,6 +64,7 @@ public class Serverv2 {
         // Verificar se o user a que o cliente se quer ligar, existe
         int userCount = db.verifyUserExists(usernameToString);
         if (userCount > 0) { // O utilizador existe
+            sendBytesToClient(client, "valid".getBytes("UTF-8"));
             // 1. Gera par de chaves Diffie Helman
             byte[] pubKeyServer = DH_Server.getServerPubKeyEnc();
             System.out.println("\r\nPub key sent to client: " + Utilities.toHexString(pubKeyServer));
@@ -187,6 +163,7 @@ public class Serverv2 {
             }
 
         } else { // O utilizador não existe
+            sendBytesToClient(client, "invalid".getBytes("UTF-8"));
             client.close();
         }   
     }
@@ -270,7 +247,7 @@ public class Serverv2 {
                     if (osname.contains("win")) {
                         command = "cmd /c " + decryptMessage;
                     } else { // Ubuntu/Mac
-                        command = "/bin/sh -c" + decryptMessage;
+                        command = "/bin/sh -c " + decryptMessage;
                     }
                     
                     try {
@@ -284,17 +261,13 @@ public class Serverv2 {
                         while ((line = reader.readLine()) != null) {
                             System.out.println(line);
                             sf.append(line + "\n");
-                            //out.println(line);
-                            //out.flush();
                         }
                       
                         reader.close();
                         System.out.println("TERMINEI!");
                         // Enviar mensagem para o servidor
                         byte[] msg = String.valueOf(sf).getBytes("UTF-8");
-                        sendSecureMessageToClient(client, serverSecretSharedKey, msg);
-                        //out.write("end\n");
-                        //out.flush();                    
+                        sendSecureMessageToClient(client, serverSecretSharedKey, msg);               
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -388,44 +361,6 @@ public class Serverv2 {
         }
         
     }
-
-    private static void sendPubKeyToclient(Socket client, byte[] pk) throws IOException {
-        try {
-            DataOutputStream dOut = new DataOutputStream(client.getOutputStream());
-
-            // System.out.println("SERVER: Sending public key to server...");
-            dOut.writeInt(pk.length); // write length of the message
-            dOut.write(pk); // write the message
-            dOut.flush();
-            System.out.println("Sent successfully!");
-        } catch (Exception e) {
-            System.out.println("Caught exception: " + e.toString());
-        }
-    }
-
-    private static String getPubKeyFromClient(Socket client) throws IOException {
-        try {
-            BufferedReader inPK = new BufferedReader(new InputStreamReader(client.getInputStream()));
-            String receivedPK = inPK.readLine();
-            return receivedPK;
-        } catch (Exception e) {
-            System.out.println("Caught exception: " + e.toString());
-            return null;
-        }
-
-    }
-
-    /*
-     * private static void sendPubKeyToclient(Socket client, PublicKey pk) throws
-     * IOException { try { PrintWriter out = new
-     * PrintWriter(client.getOutputStream(), false);
-     * 
-     * // Send pk to Client byte[] key = pk.getEncoded(); String pk_client = new
-     * String(key); //adicionada
-     * System.out.println("SERVER: Enviando chave publica para cliente.........");
-     * out.println("-pk " + pk_client); out.flush(); } catch (Exception e) {
-     * System.out.println("Caught exception: " + e.toString()); } }
-     */
 
     public InetAddress getSocketAddress() {
         return this.server.getInetAddress();

@@ -51,18 +51,27 @@ public class Clientv2 {
         String user = username;
         sendBytesToServer(client, user.getBytes("UTF-8"));
 
+        byte[] userExist = receiveBytesFromServer(client);
+        if (new String(userExist, StandardCharsets.UTF_8).equals("invalid")) {
+            System.out.println("Cannot connect to server "+client.socket.getInetAddress());
+            client.socket.close();
+            socket.close();
+            scanner.close();
+            return;
+        }
+
         // Receive pubkey DH
         byte[] pubKeyDHServer = receiveBytesFromServer(client);
-        System.out.println("\r\nPub key received from server: " + Utilities.toHexString(pubKeyDHServer));
+        //System.out.println("\r\nPub key received from server: " + Utilities.toHexString(pubKeyDHServer));
 
         // Gera par de chaves Diffie Helman
         byte[] pubKeyClient = DH_Client.getClientPubKeyEnc(pubKeyDHServer);
         // Envia a chave Pub para o Server.
-        System.out.println("\r\nPub key sent to server: " + Utilities.toHexString(pubKeyClient));
+        //System.out.println("\r\nPub key sent to server: " + Utilities.toHexString(pubKeyClient));
         sendBytesToServer(client, pubKeyClient);
         // Gerar chave secreta partilhada
         byte[] clientSecretSharedKey = DH_Client.getClientSharedSecret(pubKeyDHServer);
-        System.out.println("\r\nShared secret key: " + Utilities.toHexString(clientSecretSharedKey)); 
+        //System.out.println("\r\nShared secret key: " + Utilities.toHexString(clientSecretSharedKey)); 
 
         System.out.println("\n\n");
 
@@ -310,30 +319,6 @@ public class Clientv2 {
         client.socket.close();
     }
 
-    private static int feedbackFromServer (Clientv2 client) throws IOException {
-        BufferedReader in = new BufferedReader(new InputStreamReader(client.socket.getInputStream()));
-        String data = null;
-       
-        try { 
-            if((data = in.readLine()) != null)
-            {
-                if (data.equals("end")) {
-                    //System.out.println("Entrei Aqui");
-                    return 0;
-                }
-                System.out.println(data);
-                return 1;
-                //byte[] sms = receiveBytesFromServer(client);
-                //if (sms.length != 0) return 0;
-            } else {
-                return 0;
-            }
-        } catch (IOException i) {
-            System.out.println("Caught Exception: " + i.toString());
-            return -1;
-        }
-    }
-
     /**
      * @return public key
      **/
@@ -390,58 +375,6 @@ public class Clientv2 {
             System.out.println("Caught exception: " + e.toString());
             return null;
         }
-    }
-
-    /**
-     * Receives the pub key to the Server
-     * 
-     * @param client
-     * @return
-     * @throws IOException
-     **/
-
-    private static byte[] receiveServerPubKey(Clientv2 client) throws IOException {
-        try {
-            DataInputStream dIn = new DataInputStream(client.socket.getInputStream());
-
-            int length = dIn.readInt();   
-            byte[] message = new byte[length];      
-            if(length > 0) {
-                dIn.readFully(message, 0, message.length);             
-            }
-
-            return message;
-        } catch (Exception e) {
-            System.out.println("Caught exception: " + e.toString());
-            return null;
-        }
-    }
-
-    /**
-     * Sends the pub key to the Server
-     * @param client
-     * @param pk
-     * @throws IOException
-     **/
-
-    private static void sendPubKeyToServer(Clientv2 client, PublicKey pk) throws IOException 
-    {
-        try 
-        {
-            PrintWriter out = new PrintWriter(client.socket.getOutputStream(), false);
-
-            // Send pk to Server
-            byte[] key = pk.getEncoded();
-            String pk_client = new String(key); //adicionada  
-            System.out.println("CLIENTE: Enviando chave publica para servidor.........");
-            out.println(pk_client);
-            out.flush();
-        } 
-        catch (Exception e)
-        {
-            System.out.println("Caught exception: " + e.toString());
-        }
-
     }
 
     public static void main(String[] args) throws Exception 
